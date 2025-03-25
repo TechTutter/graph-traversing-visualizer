@@ -8,7 +8,6 @@ function App() {
   const { resetGrid, startAlgorithm, stopAlgorithm, setSelectedAlgorithm, setAnimationSpeed } = useGridControls();
   const { speed } = useAnimationConfig();
 
-  console.log('rerender');
   return (
     <div className="min-h-screen bg-gray-100 p-8">
       <div className="mx-auto max-w-6xl">
@@ -17,15 +16,24 @@ function App() {
             <select
               value={selectedAlgorithm}
               onChange={(e) => setSelectedAlgorithm(e.target.value as Algorithm)}
-              className="rounded-lg border border-gray-300 bg-white px-4 py-2"
+              className="rounded-lg border border-gray-300 bg-white px-4 py-2 disabled:opacity-50"
               disabled={isRunning}>
-              <option value="astar">A* Algorithm</option>
-              <option value="dfs">Depth First Search</option>
-              <option value="bfs">Breadth First Search</option>
+              <optgroup label="Shortest Path Algorithms">
+                <option value="astar">A* Algorithm</option>
+                <option value="dijkstra">Dijkstra's Algorithm</option>
+              </optgroup>
+              <optgroup label="Search Algorithms">
+                <option value="bfs">Breadth First Search</option>
+                <option value="dfs">Depth First Search</option>
+                <option value="bidirectionalBfs">Bidirectional BFS</option>
+              </optgroup>
+              <optgroup label="Maze Algorithms">
+                <option value="prim">Prim's Algorithm</option>
+              </optgroup>
             </select>
             <button
               onClick={resetGrid}
-              className="rounded-lg bg-blue-500 px-4 py-2 text-white hover:bg-blue-600 disabled:opacity-50"
+              className="rounded-lg bg-blue-500 px-4 py-2 text-white hover:bg-blue-600 disabled:opacity-50 disabled:hover:bg-blue-500"
               disabled={isRunning}>
               Shuffle Grid
             </button>
@@ -38,7 +46,7 @@ function App() {
                 step={10}
                 value={speed}
                 onChange={(e) => setAnimationSpeed(Number(e.target.value))}
-                className="w-32"
+                className="w-32 disabled:opacity-50"
                 disabled={isRunning}
               />
               <span className="text-sm text-gray-600">{speed}ms</span>

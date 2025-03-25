@@ -1,7 +1,10 @@
 import { Algorithm, Cell, Grid } from '../types/grid';
 import { astar } from './astar';
 import { bfs } from './bfs';
+import { bidirectionalBfs } from './bidirectionalBfs';
 import { dfs } from './dfs';
+import { dijkstra } from './dijkstra';
+import { prim } from './prim';
 
 type AlgorithmStep = {
   current: Cell;
@@ -11,6 +14,7 @@ type AlgorithmStep = {
   stack?: Cell[];
   queue?: Cell[];
   path: Cell[];
+  isForward?: boolean;
 };
 
 export function runAlgorithm(
@@ -52,6 +56,40 @@ export function runAlgorithm(
             current: step.current,
             queue: step.queue,
             visited: step.visited,
+            path: step.path,
+          });
+        });
+        break;
+
+      case 'dijkstra':
+        result = dijkstra(grid, start, end, (step) => {
+          onStep({
+            current: step.current,
+            openSet: step.openSet,
+            closedSet: step.closedSet,
+            path: step.path,
+          });
+        });
+        break;
+
+      case 'bidirectionalBfs':
+        result = bidirectionalBfs(grid, start, end, (step) => {
+          onStep({
+            current: step.current,
+            queue: step.queue,
+            visited: step.visited,
+            path: step.path,
+            isForward: step.isForward,
+          });
+        });
+        break;
+
+      case 'prim':
+        result = prim(grid, start, end, (step) => {
+          onStep({
+            current: step.current,
+            openSet: step.openSet,
+            closedSet: step.closedSet,
             path: step.path,
           });
         });

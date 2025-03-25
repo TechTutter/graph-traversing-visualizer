@@ -21,7 +21,13 @@ export type Cell = {
 
 export type Grid = Cell[][];
 
-export type Algorithm = 'astar' | 'dfs' | 'bfs';
+export type Algorithm =
+  | 'astar'
+  | 'dfs'
+  | 'bfs'
+  | 'dijkstra'
+  | 'bidirectionalBfs'
+  | 'prim';
 
 export type GridConfig = {
   rows: number;
