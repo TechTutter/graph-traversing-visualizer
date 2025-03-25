@@ -1,0 +1,57 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap');
+@import 'tailwindcss';
+
+/* All Styles */
+@import '../styles/loader.css';
+
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+  /* Colors */
+  --color-primary-50: #faf5ff;
+  --color-primary-100: #f2e8ff;
+  --color-primary-200: #e8d5ff;
+  --color-primary-300: #d6b4fe;
+  --color-primary-400: #bd84fc;
+  --color-primary-500: #6c63ff;
+  --color-primary-600: #8726e8;
+  --color-primary-700: #7a23cd;
+  --color-primary-800: #6821a8;
+  --color-primary-900: #551c87;
+  --color-primary-950: #390764;
+  --color-primary: #6c63ff;
+}
+
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentColor);
+  }
+}
+
+html,
+body {
+  font-family: 'Inter', sans-serif;
+  -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+  text-rendering: optimizeSpeed;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  position: relative;
+}
+
+/* Ripple effect */
+.ripple {
+  background-position: center;
+  transition: background 0.8s;
+}
+.ripple:hover {
+  background: var(--color-primary) radial-gradient(circle, transparent 1%, rgba(108, 99, 255, 0.6) 1%) center/15000%;
+}
+.ripple:active {
+  background-color: rgba(108, 99, 255, 0.6);
+  background-size: 100%;
+  transition: background 0s;
+}
