@@ -1,37 +1,39 @@
-import { memo, useEffect } from 'react';
+import React from 'react';
 import { useGridData } from '../store/useGridStore';
-import { Cell as CellType } from '../types/grid';
 import Cell from './Cell';
 
-// Memoized row component to prevent unnecessary rerenders
-const GridRow = memo(function GridRow({ row }: { row: CellType[] }) {
-  return (
-    <div className="flex gap-0">
-      {row.map((cell) => (
-        <Cell key={cell.id} cell={cell} />
-      ))}
-    </div>
-  );
-});
+type GridProps = {
+  cellSize: number;
+};
 
-function Grid() {
+function Grid({ cellSize }: GridProps) {
   const { grid, initializeGrid, gridConfig } = useGridData();
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (!grid.length) {
       initializeGrid(gridConfig);
     }
-  }, []); // Empty dependency array since we only want to initialize once
-
-  if (!grid.length) return null;
+  }, [grid.length, initializeGrid, gridConfig]);
 
   return (
-    <div className="flex flex-col items-center justify-center gap-0">
-      {grid.map((row, y) => (
-        <GridRow key={y} row={row} />
-      ))}
+    <div className="flex justify-center items-center h-[calc(100vh-64px)]">
+      <div className="grid gap-0">
+        {grid.map((row, rowIndex) => (
+          <div key={rowIndex} className="flex">
+            {row.map((cell, colIndex) => (
+              <Cell
+                key={`${rowIndex}-${colIndex}`}
+                cell={cell}
+                size={cellSize}
+                onClick={() => {}}
+                onMouseEnter={() => {}}
+              />
+            ))}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
 
-export default memo(Grid);
+export default Grid;

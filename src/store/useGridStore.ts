@@ -32,7 +32,7 @@ type GridDataStore = {
   stopAlgorithm: () => void;
 }
 
-const DEFAULT_CONFIG: GridConfig = {
+export const DEFAULT_CONFIG: GridConfig = {
   rows: 20,
   cols: 30,
   obstaclePercentage: 0.3,
@@ -54,6 +54,7 @@ function createCell(x: number, y: number, type: CellType): Cell {
     y,
     type,
     state: 'unvisited',
+    weight: 1, // Default weight for unweighted cells
   };
 }
 

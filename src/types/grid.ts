@@ -13,6 +13,7 @@ export type Cell = {
   y: number;
   type: CellType;
   state: CellState;
+  weight: number;  // for weighted algorithms like Dijkstra's
   f?: number; // for A* algorithm
   g?: number; // for A* algorithm
   h?: number; // for A* algorithm

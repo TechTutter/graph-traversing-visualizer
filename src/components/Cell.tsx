@@ -6,6 +6,7 @@ type CellProps = {
   cell: CellType;
   onClick: () => void;
   onMouseEnter: () => void;
+  size: number;
 };
 
 const getBackgroundColor = (type: CellType['type'], state: CellState): string => {
@@ -36,20 +37,20 @@ const getBackgroundColor = (type: CellType['type'], state: CellState): string =>
   }
 };
 
-export function Cell({ cell, onClick, onMouseEnter }: CellProps) {
+export function Cell({ cell, onClick, onMouseEnter, size }: CellProps) {
   return (
     <div
       onClick={onClick}
       onMouseEnter={onMouseEnter}
       style={{
-        width: '32px',
-        height: '32px',
+        width: `${size}px`,
+        height: `${size}px`,
         border: '1px solid #E0E0E0',
         backgroundColor: getBackgroundColor(cell.type, cell.state),
         transition: 'background-color 0.2s ease',
         cursor: 'pointer',
-        minWidth: '32px',
-        minHeight: '32px',
+        minWidth: `${size}px`,
+        minHeight: `${size}px`,
         display: 'flex',
         flexShrink: 0,
       }}
