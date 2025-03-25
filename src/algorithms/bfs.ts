@@ -1,5 +1,5 @@
 import { Cell, Grid } from '../types/grid';
-import { getNeighbors, reconstructPath } from '../utils/algorithmHelpers';
+import { getNeighbors } from '../utils/algorithmHelpers';
 
 type BFSStep = {
   current: Cell;
@@ -8,53 +8,60 @@ type BFSStep = {
   path: Cell[];
 };
 
-export function bfs(
-  grid: Grid,
-  start: Cell,
-  end: Cell,
-  onStep?: (step: BFSStep) => void
-): Cell[] {
+export async function* bfs(grid: Grid, start: Cell, end: Cell): AsyncGenerator<BFSStep> {
   const queue: Cell[] = [start];
   const visited = new Set<string>();
-  visited.add(`${start.x},${start.y}`);
+  const cameFrom = new Map<string, Cell>();
+
+  visited.add(start.id);
 
   while (queue.length > 0) {
     const current = queue.shift()!;
 
-    // If we found the end, return the path
-    if (current.x === end.x && current.y === end.y) {
-      const path = reconstructPath(current);
-      onStep?.({
+    // If we found the end, reconstruct and return the path
+    if (current.id === end.id) {
+      const path: Cell[] = [];
+      let curr = current;
+      while (cameFrom.has(curr.id)) {
+        path.unshift(curr);
+        curr = cameFrom.get(curr.id)!;
+      }
+      path.unshift(start);
+
+      yield {
         current,
         queue,
         visited,
         path,
-      });
-      return path;
+      };
+      return;
     }
 
-    // Get unvisited neighbors
+    // Get neighbors
     const neighbors = getNeighbors(grid, current);
+
+    // Process each unvisited neighbor
     for (const neighbor of neighbors) {
-      const neighborId = `${neighbor.x},${neighbor.y}`;
-      if (!visited.has(neighborId)) {
-        visited.add(neighborId);
-        queue.push({
-          ...neighbor,
-          parent: current,
-        });
+      if (!visited.has(neighbor.id)) {
+        visited.add(neighbor.id);
+        queue.push(neighbor);
+        cameFrom.set(neighbor.id, current);
       }
     }
 
-    // Notify step
-    onStep?.({
+    yield {
       current,
-      queue,
+      queue: [...queue],
       visited,
       path: [],
-    });
+    };
   }
 
   // No path found
-  return [];
+  yield {
+    current: start,
+    queue: [],
+    visited,
+    path: [],
+  };
 } 

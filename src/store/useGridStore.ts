@@ -1,8 +1,9 @@
 import { create } from 'zustand';
 import { useShallow } from 'zustand/shallow';
-import { runAlgorithm } from '../algorithms';
+import { algorithms } from '../algorithms';
 import { Algorithm, AnimationConfig, Cell, CellType, Grid, GridConfig } from '../types/grid';
 import { createThrottledAnimationFrame } from '../utils/animation';
+import { generateId } from '../utils/generateId';
 
 // Split into smaller stores for better performance
 type GridConfigStore = {
@@ -17,6 +18,8 @@ type AlgorithmStore = {
   setSelectedAlgorithm: (algorithm: Algorithm) => void;
   setAnimationSpeed: (speed: number) => void;
   setIsRunning: (isRunning: boolean) => void;
+  startAlgorithm: () => Promise<AlgorithmResult>;
+  stopAlgorithm: () => void;
 }
 
 type GridDataStore = {
@@ -28,8 +31,6 @@ type GridDataStore = {
   setEndCell: (cell: Cell) => void;
   setCellState: (x: number, y: number, state: Cell['state']) => void;
   resetGrid: () => void;
-  startAlgorithm: () => Promise<void>;
-  stopAlgorithm: () => void;
 }
 
 export const DEFAULT_CONFIG: GridConfig = {
@@ -43,10 +44,6 @@ const DEFAULT_ANIMATION_CONFIG: AnimationConfig = {
   isPlaying: false,
 };
 
-function generateId(x: number, y: number): string {
-  return `cell-${x}-${y}`;
-}
-
 function createCell(x: number, y: number, type: CellType): Cell {
   return {
     id: generateId(x, y),
@@ -57,6 +54,11 @@ function createCell(x: number, y: number, type: CellType): Cell {
     weight: 1, // Default weight for unweighted cells
   };
 }
+
+type AlgorithmResult = {
+  success: boolean;
+  steps: number;
+};
 
 // Create the store with separate slices
 export const useGridStore = create<GridConfigStore & AlgorithmStore & GridDataStore>((set, get) => {
@@ -148,10 +150,10 @@ export const useGridStore = create<GridConfigStore & AlgorithmStore & GridDataSt
       get().initializeGrid(gridConfig);
     },
 
-    startAlgorithm: async () => {
+    startAlgorithm: async (): Promise<AlgorithmResult> => {
       const { grid, startCell, endCell, selectedAlgorithm, animationConfig } = get();
 
-      if (!startCell || !endCell || get().isRunning) return;
+      if (!startCell || !endCell || get().isRunning) return { success: false, steps: 0 };
 
       set({ isRunning: true });
 
@@ -177,97 +179,44 @@ export const useGridStore = create<GridConfigStore & AlgorithmStore & GridDataSt
         // Create animation controller
         animationController = createThrottledAnimationFrame(animationConfig.speed);
 
-        await runAlgorithm(
-          selectedAlgorithm,
-          newGrid,
-          startCell,
-          endCell,
-          async (step) => {
-            if (!get().isRunning) return;
+        let steps = 0;
+        let foundPath = false;
 
-            const { current, path, openSet, queue, stack } = step;
+        const algorithm = algorithms[selectedAlgorithm];
+        if (!algorithm) {
+          return { success: false, steps: 0 };
+        }
 
-            // Handle path found case first
-            if (path.length > 0) {
-              // First, ensure all visited cells are marked and clean up neighbors
-              const allCells = new Set([...visitedCells]);
+        for await (const step of algorithm(newGrid, startCell, endCell)) {
+          if (!get().isRunning) {
+            return { success: false, steps };
+          }
 
-              // Clear any remaining neighbor cells
-              newGrid.forEach((row, y) => {
-                row.forEach((cell, x) => {
-                  if (cell.state === 'neighbor') {
-                    get().setCellState(x, y, 'unvisited');
-                  }
-                });
-              });
+          steps++;
 
-              // Wait for cleanup
-              await animationController?.request(() => { });
+          // Update cell states
+          if (step.visited) {
+            step.visited.forEach(cell => {
+              get().setCellState(cell.x, cell.y, 'visited');
+            });
+          }
 
-              // Mark all visited cells
-              for (const cellId of allCells) {
-                const [x, y] = cellId.split(',').map(Number);
-                const cell = newGrid[y][x];
-                if (cell.type !== 'start' && cell.type !== 'end' && cell.state !== 'path') {
-                  get().setCellState(x, y, 'visited');
-                }
-              }
+          if (step.current) {
+            get().setCellState(step.current.x, step.current.y, 'current');
+          }
 
-              // Wait for visited states to be applied
-              await animationController?.request(() => { });
-
-              // Then show the path with a slight delay for visual clarity
-              await animationController?.request(() => { });
-
-              for (const cell of path) {
-                if (cell.type !== 'start' && cell.type !== 'end') {
-                  get().setCellState(cell.x, cell.y, 'path');
-                  // Wait for each path cell to be shown
-                  await animationController?.request(() => { });
-                }
-              }
-
-              get().stopAlgorithm();
-              return;
-            }
-
-            // Normal step animation
-            await animationController?.request(() => {
-              // 1. Clear previous current node if it exists
-              if (previousCurrent &&
-                previousCurrent.type !== 'start' &&
-                previousCurrent.type !== 'end') {
-                get().setCellState(previousCurrent.x, previousCurrent.y, 'visited');
-                visitedCells.add(`${previousCurrent.x},${previousCurrent.y}`);
-              }
-
-              // 2. Mark the current cell as 'current'
-              if (current.type !== 'start' && current.type !== 'end') {
-                get().setCellState(current.x, current.y, 'current');
-              }
-
-              // 3. Mark only the immediate unvisited neighbors of the current cell
-              const neighbors = openSet || queue || stack || [];
-              const currentNeighbors = neighbors.filter(n => {
-                // Only show neighbors that are directly connected to the current cell
-                return Math.abs(n.x - current.x) + Math.abs(n.y - current.y) === 1 &&
-                  !visitedCells.has(`${n.x},${n.y}`);
-              });
-
-              for (const neighbor of currentNeighbors) {
-                if (
-                  neighbor.type !== 'start' &&
-                  neighbor.type !== 'end' &&
-                  neighbor.state === 'unvisited'
-                ) {
-                  get().setCellState(neighbor.x, neighbor.y, 'neighbor');
-                }
+          if (step.path.length > 0) {
+            step.path.forEach(cell => {
+              if (cell.type !== 'start' && cell.type !== 'end') {
+                get().setCellState(cell.x, cell.y, 'path');
               }
             });
-
-            previousCurrent = current;
+            get().stopAlgorithm();
+            return { success: true, steps };
           }
-        );
+
+          await new Promise(resolve => setTimeout(resolve, animationConfig.speed));
+        }
       } finally {
         if (animationController) {
           animationController.cancel();
@@ -275,6 +224,7 @@ export const useGridStore = create<GridConfigStore & AlgorithmStore & GridDataSt
         }
         set({ isRunning: false });
       }
+      return { success: false, steps };
     },
 
     stopAlgorithm: () => {

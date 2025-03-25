@@ -1,5 +1,5 @@
 import { Cell, Grid } from '../types/grid';
-import { getNeighbors, manhattan, reconstructPath } from '../utils/algorithmHelpers';
+import { getNeighbors, manhattan } from '../utils/algorithmHelpers';
 
 type AStarStep = {
   current: Cell;
@@ -8,76 +8,86 @@ type AStarStep = {
   path: Cell[];
 };
 
-export function astar(
-  grid: Grid,
-  start: Cell,
-  end: Cell,
-  onStep?: (step: AStarStep) => void
-): Cell[] {
-  const openSet: Cell[] = [{ ...start, g: 0, f: manhattan(start, end) }];
+export async function* astar(grid: Grid, start: Cell, end: Cell): AsyncGenerator<AStarStep> {
+  const openSet: Cell[] = [start];
   const closedSet: Cell[] = [];
+  const cameFrom = new Map<string, Cell>();
+  const gScore = new Map<string, number>();
+  const fScore = new Map<string, number>();
+
+  gScore.set(start.id, 0);
+  fScore.set(start.id, manhattan(start, end));
 
   while (openSet.length > 0) {
-    // Find node with lowest f score
+    // Find the node with the lowest fScore
     let current = openSet[0];
-    let currentIndex = 0;
+    let lowestF = fScore.get(current.id) || Infinity;
 
-    openSet.forEach((node, index) => {
-      if (node.f! < current.f!) {
-        current = node;
-        currentIndex = index;
+    for (let i = 1; i < openSet.length; i++) {
+      const f = fScore.get(openSet[i].id) || Infinity;
+      if (f < lowestF) {
+        lowestF = f;
+        current = openSet[i];
       }
-    });
-
-    // If we reached the end, return the path
-    if (current.x === end.x && current.y === end.y) {
-      const path = reconstructPath(current);
-      onStep?.({ current, openSet, closedSet, path });
-      return path;
     }
 
-    // Remove current from openSet and add to closedSet
-    openSet.splice(currentIndex, 1);
+    // If we reached the end, reconstruct and return the path
+    if (current.id === end.id) {
+      const path: Cell[] = [];
+      let curr = current;
+      while (cameFrom.has(curr.id)) {
+        path.unshift(curr);
+        curr = cameFrom.get(curr.id)!;
+      }
+      path.unshift(start);
+
+      yield {
+        current,
+        openSet,
+        closedSet,
+        path,
+      };
+      return;
+    }
+
+    // Move current from openSet to closedSet
+    openSet.splice(openSet.indexOf(current), 1);
     closedSet.push(current);
 
-    // Check all neighbors
+    // Get neighbors
     const neighbors = getNeighbors(grid, current);
 
     for (const neighbor of neighbors) {
-      // Skip if neighbor is in closedSet
-      if (closedSet.some(node => node.x === neighbor.x && node.y === neighbor.y)) {
+      if (closedSet.some(c => c.id === neighbor.id)) {
         continue;
       }
 
-      // Calculate g score for this path
-      const tentativeG = current.g! + 1;
+      const tentativeGScore = (gScore.get(current.id) || 0) + neighbor.weight;
 
-      // Check if neighbor is in openSet
-      const openNeighbor = openSet.find(
-        node => node.x === neighbor.x && node.y === neighbor.y
-      );
-
-      if (!openNeighbor) {
-        // Add neighbor to openSet
-        const h = manhattan(neighbor, end);
-        openSet.push({
-          ...neighbor,
-          g: tentativeG,
-          f: tentativeG + h,
-          parent: current,
-        });
-      } else if (tentativeG < openNeighbor.g!) {
-        // Update neighbor if this path is better
-        openNeighbor.g = tentativeG;
-        openNeighbor.f = tentativeG + manhattan(neighbor, end);
-        openNeighbor.parent = current;
+      if (!openSet.some(c => c.id === neighbor.id)) {
+        openSet.push(neighbor);
+      } else if (tentativeGScore >= (gScore.get(neighbor.id) || Infinity)) {
+        continue;
       }
+
+      cameFrom.set(neighbor.id, current);
+      gScore.set(neighbor.id, tentativeGScore);
+      fScore.set(neighbor.id, tentativeGScore + manhattan(neighbor, end));
     }
 
-    // Notify step
-    onStep?.({ current, openSet, closedSet, path: [] });
+    yield {
+      current,
+      openSet: [...openSet],
+      closedSet: [...closedSet],
+      path: [],
+    };
   }
 
   // No path found
-  return [];
+  yield {
+    current: start,
+    openSet: [],
+    closedSet,
+    path: [],
+  };
 } 

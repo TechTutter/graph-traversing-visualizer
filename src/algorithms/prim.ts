@@ -1,5 +1,5 @@
 import { Cell, Grid } from '../types/grid';
-import { getNeighbors, reconstructPath } from '../utils/algorithmHelpers';
+import { getNeighbors } from '../utils/algorithmHelpers';
 
 type PrimStep = {
   current: Cell;
@@ -8,77 +8,83 @@ type PrimStep = {
   path: Cell[];
 };
 
-export function prim(
-  grid: Grid,
-  start: Cell,
-  end: Cell,
-  onStep?: (step: PrimStep) => void
-): Cell[] {
-  const openSet: Cell[] = [{ ...start, weight: 0 }];
+export async function* prim(grid: Grid, start: Cell, end: Cell): AsyncGenerator<PrimStep> {
+  const openSet: Cell[] = [start];
   const closedSet: Cell[] = [];
+  const cameFrom = new Map<string, Cell>();
   const weights = new Map<string, number>();
-  weights.set(`${start.x},${start.y}`, 0);
+
+  weights.set(start.id, 0);
 
   while (openSet.length > 0) {
-    // Find node with minimum weight
+    // Find the node with the lowest weight
     let current = openSet[0];
-    let currentIndex = 0;
+    let lowestWeight = weights.get(current.id) || Infinity;
 
-    openSet.forEach((node, index) => {
-      const nodeWeight = weights.get(`${node.x},${node.y}`)!;
-      const currentWeight = weights.get(`${current.x},${current.y}`)!;
-      if (nodeWeight < currentWeight) {
-        current = node;
-        currentIndex = index;
+    for (let i = 1; i < openSet.length; i++) {
+      const weight = weights.get(openSet[i].id) || Infinity;
+      if (weight < lowestWeight) {
+        lowestWeight = weight;
+        current = openSet[i];
       }
-    });
-
-    // If we reached the end, return the path
-    if (current.x === end.x && current.y === end.y) {
-      const path = reconstructPath(current);
-      onStep?.({ current, openSet, closedSet, path });
-      return path;
     }
 
-    // Remove current from openSet and add to closedSet
-    openSet.splice(currentIndex, 1);
+    // If we reached the end, reconstruct and return the path
+    if (current.id === end.id) {
+      const path: Cell[] = [];
+      let curr = current;
+      while (cameFrom.has(curr.id)) {
+        path.unshift(curr);
+        curr = cameFrom.get(curr.id)!;
+      }
+      path.unshift(start);
+
+      yield {
+        current,
+        openSet,
+        closedSet,
+        path,
+      };
+      return;
+    }
+
+    // Move current from openSet to closedSet
+    openSet.splice(openSet.indexOf(current), 1);
     closedSet.push(current);
 
-    // Check all neighbors
+    // Get neighbors
     const neighbors = getNeighbors(grid, current);
-    const currentWeight = weights.get(`${current.x},${current.y}`)!;
 
     for (const neighbor of neighbors) {
-      const neighborId = `${neighbor.x},${neighbor.y}`;
-
-      // Skip if neighbor is in closedSet
-      if (closedSet.some(node => node.x === neighbor.x && node.y === neighbor.y)) {
+      if (closedSet.some(c => c.id === neighbor.id)) {
         continue;
       }
 
-      const weight = currentWeight + 1; // Using uniform weight of 1
+      const weight = neighbor.weight;
 
-      if (!weights.has(neighborId) || weight < weights.get(neighborId)!) {
-        weights.set(neighborId, weight);
-        const openNeighbor = openSet.find(
-          node => node.x === neighbor.x && node.y === neighbor.y
-        );
-
-        if (!openNeighbor) {
-          openSet.push({
-            ...neighbor,
-            parent: current,
-          });
-        } else {
-          openNeighbor.parent = current;
-        }
+      if (!openSet.some(c => c.id === neighbor.id)) {
+        openSet.push(neighbor);
+        weights.set(neighbor.id, weight);
+        cameFrom.set(neighbor.id, current);
+      } else if (weight < (weights.get(neighbor.id) || Infinity)) {
+        weights.set(neighbor.id, weight);
+        cameFrom.set(neighbor.id, current);
       }
     }
 
-    // Notify step
-    onStep?.({ current, openSet, closedSet, path: [] });
+    yield {
+      current,
+      openSet: [...openSet],
+      closedSet: [...closedSet],
+      path: [],
+    };
   }
 
   // No path found
-  return [];
+  yield {
+    current: start,
+    openSet: [],
+    closedSet,
+    path: [],
+  };
 } 

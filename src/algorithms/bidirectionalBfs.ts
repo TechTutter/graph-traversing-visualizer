@@ -9,121 +9,126 @@ type BidirectionalBFSStep = {
   isForward: boolean;
 };
 
-export function bidirectionalBfs(
-  grid: Grid,
-  start: Cell,
-  end: Cell,
-  onStep?: (step: BidirectionalBFSStep) => void
-): Cell[] {
-  // Forward search from start
+export async function* bidirectionalBfs(grid: Grid, start: Cell, end: Cell): AsyncGenerator<BidirectionalBFSStep> {
   const forwardQueue: Cell[] = [start];
-  const forwardVisited = new Map<string, Cell>();
-  forwardVisited.set(`${start.x},${start.y}`, start);
-
-  // Backward search from end
   const backwardQueue: Cell[] = [end];
-  const backwardVisited = new Map<string, Cell>();
-  backwardVisited.set(`${end.x},${end.y}`, end);
+  const forwardVisited = new Set<string>([start.id]);
+  const backwardVisited = new Set<string>([end.id]);
+  const forwardCameFrom = new Map<string, Cell>();
+  const backwardCameFrom = new Map<string, Cell>();
 
   while (forwardQueue.length > 0 && backwardQueue.length > 0) {
-    // Forward search step
+    // Forward search
     const current = forwardQueue.shift()!;
-    const currentId = `${current.x},${current.y}`;
 
     // Check if we've found a meeting point
-    if (backwardVisited.has(currentId)) {
-      const path = reconstructBidirectionalPath(current, backwardVisited.get(currentId)!);
-      onStep?.({
+    if (backwardVisited.has(current.id)) {
+      // Reconstruct path from both directions
+      const path: Cell[] = [];
+
+      // Forward path
+      let curr = current;
+      while (forwardCameFrom.has(curr.id)) {
+        path.unshift(curr);
+        curr = forwardCameFrom.get(curr.id)!;
+      }
+      path.unshift(start);
+
+      // Backward path
+      curr = current;
+      while (backwardCameFrom.has(curr.id)) {
+        curr = backwardCameFrom.get(curr.id)!;
+        path.push(curr);
+      }
+
+      yield {
         current,
         queue: forwardQueue,
-        visited: new Set(forwardVisited.keys()),
+        visited: forwardVisited,
         path,
         isForward: true,
-      });
-      return path;
+      };
+      return;
     }
 
     // Process forward neighbors
-    const neighbors = getNeighbors(grid, current);
-    for (const neighbor of neighbors) {
-      const neighborId = `${neighbor.x},${neighbor.y}`;
-      if (!forwardVisited.has(neighborId)) {
+    const forwardNeighbors = getNeighbors(grid, current);
+    for (const neighbor of forwardNeighbors) {
+      if (!forwardVisited.has(neighbor.id)) {
+        forwardVisited.add(neighbor.id);
         forwardQueue.push(neighbor);
-        forwardVisited.set(neighborId, { ...neighbor, parent: current });
+        forwardCameFrom.set(neighbor.id, current);
       }
     }
 
-    onStep?.({
+    yield {
       current,
-      queue: forwardQueue,
-      visited: new Set(forwardVisited.keys()),
+      queue: [...forwardQueue],
+      visited: forwardVisited,
       path: [],
       isForward: true,
-    });
+    };
 
-    // Backward search step
+    // Backward search
     if (backwardQueue.length > 0) {
-      const backCurrent = backwardQueue.shift()!;
-      const backCurrentId = `${backCurrent.x},${backCurrent.y}`;
+      const current = backwardQueue.shift()!;
 
       // Check if we've found a meeting point
-      if (forwardVisited.has(backCurrentId)) {
-        const path = reconstructBidirectionalPath(
-          forwardVisited.get(backCurrentId)!,
-          backCurrent
-        );
-        onStep?.({
-          current: backCurrent,
+      if (forwardVisited.has(current.id)) {
+        // Reconstruct path from both directions
+        const path: Cell[] = [];
+
+        // Forward path to meeting point
+        let curr = current;
+        while (forwardCameFrom.has(curr.id)) {
+          path.unshift(curr);
+          curr = forwardCameFrom.get(curr.id)!;
+        }
+        path.unshift(start);
+
+        // Backward path from meeting point
+        curr = current;
+        while (backwardCameFrom.has(curr.id)) {
+          curr = backwardCameFrom.get(curr.id)!;
+          path.push(curr);
+        }
+
+        yield {
+          current,
           queue: backwardQueue,
-          visited: new Set(backwardVisited.keys()),
+          visited: backwardVisited,
           path,
           isForward: false,
-        });
-        return path;
+        };
+        return;
       }
 
       // Process backward neighbors
-      const backNeighbors = getNeighbors(grid, backCurrent);
-      for (const neighbor of backNeighbors) {
-        const neighborId = `${neighbor.x},${neighbor.y}`;
-        if (!backwardVisited.has(neighborId)) {
+      const backwardNeighbors = getNeighbors(grid, current);
+      for (const neighbor of backwardNeighbors) {
+        if (!backwardVisited.has(neighbor.id)) {
+          backwardVisited.add(neighbor.id);
           backwardQueue.push(neighbor);
-          backwardVisited.set(neighborId, { ...neighbor, parent: backCurrent });
+          backwardCameFrom.set(neighbor.id, current);
         }
       }
 
-      onStep?.({
-        current: backCurrent,
-        queue: backwardQueue,
-        visited: new Set(backwardVisited.keys()),
+      yield {
+        current,
+        queue: [...backwardQueue],
+        visited: backwardVisited,
         path: [],
         isForward: false,
-      });
+      };
     }
   }
 
   // No path found
-  return [];
-}
-
-function reconstructBidirectionalPath(forwardNode: Cell, backwardNode: Cell): Cell[] {
-  const forwardPath: Cell[] = [];
-  const backwardPath: Cell[] = [];
-
-  // Build path from start to meeting point
-  let current: Cell | undefined = forwardNode;
-  while (current) {
-    forwardPath.unshift(current);
-    current = current.parent;
-  }
-
-  // Build path from meeting point to end
-  current = backwardNode.parent;
-  while (current) {
-    backwardPath.push(current);
-    current = current.parent;
-  }
-
-  // Combine paths
-  return [...forwardPath, ...backwardPath];
+  yield {
+    current: start,
+    queue: [],
+    visited: forwardVisited,
+    path: [],
+    isForward: true,
+  };
 } 

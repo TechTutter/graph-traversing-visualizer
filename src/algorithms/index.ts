@@ -17,6 +17,17 @@ type AlgorithmStep = {
   isForward?: boolean;
 };
 
+type PathfindingAlgorithm = (grid: Grid, start: Cell, end: Cell) => AsyncGenerator<AlgorithmStep>;
+
+export const algorithms: Record<Algorithm, PathfindingAlgorithm> = {
+  astar,
+  bfs,
+  dfs,
+  dijkstra,
+  bidirectionalBfs,
+  prim,
+};
+
 export function runAlgorithm(
   algorithm: Algorithm,
   grid: Grid,
