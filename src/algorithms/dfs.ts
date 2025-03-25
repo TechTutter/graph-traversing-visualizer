@@ -1,23 +1,18 @@
-import { Cell, Grid } from '../types/grid';
-import { getNeighbors } from '../utils/algorithmHelpers';
+import { AlgorithmStep, Cell, Grid } from '../types/grid';
+import { getNeighbors } from '../utils/grid';
 
-type DFSStep = {
-  current: Cell;
-  stack: Cell[];
-  visited: Set<string>;
-  path: Cell[];
-};
+type DFSStep = AlgorithmStep;
 
-export async function* dfs(grid: Grid, start: Cell, end: Cell): AsyncGenerator<DFSStep> {
+export async function* dfs(grid: Grid, start: Cell, end: Cell): AsyncGenerator<DFSStep, void, unknown> {
   const stack: Cell[] = [start];
-  const visited = new Set<string>();
+  const visited: Cell[] = [];
   const cameFrom = new Map<string, Cell>();
 
   while (stack.length > 0) {
     const current = stack.pop()!;
 
-    if (!visited.has(current.id)) {
-      visited.add(current.id);
+    if (!visited.some(c => c.id === current.id)) {
+      visited.push(current);
 
       // If we found the end, reconstruct and return the path
       if (current.id === end.id) {
@@ -43,7 +38,7 @@ export async function* dfs(grid: Grid, start: Cell, end: Cell): AsyncGenerator<D
 
       // Process each unvisited neighbor
       for (const neighbor of neighbors) {
-        if (!visited.has(neighbor.id)) {
+        if (!visited.some(c => c.id === neighbor.id)) {
           stack.push(neighbor);
           cameFrom.set(neighbor.id, current);
         }

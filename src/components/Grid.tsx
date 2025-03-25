@@ -16,10 +16,10 @@ function Grid({ cellSize }: GridProps) {
   }, [grid.length, initializeGrid, gridConfig]);
 
   return (
-    <div className="flex justify-center items-center h-[calc(100vh-64px)]">
-      <div className="grid gap-0">
+    <div className="w-full h-full flex items-center justify-center">
+      <div className="grid auto-rows-max content-center">
         {grid.map((row, rowIndex) => (
-          <div key={rowIndex} className="flex">
+          <div key={rowIndex} className="flex flex-nowrap">
             {row.map((cell, colIndex) => (
               <Cell
                 key={`${rowIndex}-${colIndex}`}

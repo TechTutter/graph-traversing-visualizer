@@ -1,9 +1,8 @@
 import { create } from 'zustand';
 import { useShallow } from 'zustand/shallow';
 import { algorithms } from '../algorithms';
-import { Algorithm, AnimationConfig, Cell, CellType, Grid, GridConfig } from '../types/grid';
+import { Algorithm, AlgorithmResult, AlgorithmStep, AnimationConfig, Cell, CellType, Grid, GridConfig } from '../types/grid';
 import { createThrottledAnimationFrame } from '../utils/animation';
-import { generateId } from '../utils/generateId';
 
 // Split into smaller stores for better performance
 type GridConfigStore = {
@@ -15,6 +14,13 @@ type AlgorithmStore = {
   selectedAlgorithm: Algorithm;
   isRunning: boolean;
   animationConfig: AnimationConfig;
+  currentStep: number;
+  visitedNodes: number;
+  algorithmState: {
+    grid: Grid;
+    generator: AsyncGenerator<AlgorithmStep, void, unknown> | null;
+    lastStep: AlgorithmStep | null;
+  };
   setSelectedAlgorithm: (algorithm: Algorithm) => void;
   setAnimationSpeed: (speed: number) => void;
   setIsRunning: (isRunning: boolean) => void;
@@ -40,13 +46,13 @@ export const DEFAULT_CONFIG: GridConfig = {
 };
 
 const DEFAULT_ANIMATION_CONFIG: AnimationConfig = {
-  speed: 100,
+  speed: 20,
   isPlaying: false,
 };
 
 function createCell(x: number, y: number, type: CellType): Cell {
   return {
-    id: generateId(x, y),
+    id: `${x}-${y}`,
     x,
     y,
     type,
@@ -55,14 +61,8 @@ function createCell(x: number, y: number, type: CellType): Cell {
   };
 }
 
-type AlgorithmResult = {
-  success: boolean;
-  steps: number;
-};
-
 // Create the store with separate slices
 export const useGridStore = create<GridConfigStore & AlgorithmStore & GridDataStore>((set, get) => {
-  // Keep animation controller in closure
   let animationController: ReturnType<typeof createThrottledAnimationFrame> | null = null;
 
   return {
@@ -74,12 +74,189 @@ export const useGridStore = create<GridConfigStore & AlgorithmStore & GridDataSt
     selectedAlgorithm: 'astar',
     isRunning: false,
     animationConfig: DEFAULT_ANIMATION_CONFIG,
-    setSelectedAlgorithm: (algorithm) => set({ selectedAlgorithm: algorithm }),
+    currentStep: 0,
+    visitedNodes: 0,
+    algorithmState: {
+      grid: [],
+      generator: null,
+      lastStep: null,
+    },
+    setSelectedAlgorithm: (algorithm) => {
+      const { grid } = get();
+      // Reset grid states except for start, end, and blocked cells
+      const newGrid = grid.map(row =>
+        row.map(cell => ({
+          ...cell,
+          state: ['start', 'end', 'blocked'].includes(cell.type)
+            ? cell.state
+            : 'unvisited',
+          parent: undefined,
+          f: undefined,
+          g: undefined,
+          h: undefined,
+        }))
+      );
+      set({
+        selectedAlgorithm: algorithm,
+        grid: newGrid,
+        currentStep: 0,
+        visitedNodes: 0,
+        algorithmState: {
+          grid: [],
+          generator: null,
+          lastStep: null,
+        }
+      });
+    },
+
     setAnimationSpeed: (speed) =>
       set((state) => ({
         animationConfig: { ...state.animationConfig, speed },
       })),
+
     setIsRunning: (isRunning) => set({ isRunning }),
+
+    startAlgorithm: async (): Promise<AlgorithmResult> => {
+      const { grid, startCell, endCell, selectedAlgorithm, animationConfig, algorithmState } = get();
+
+      if (!startCell || !endCell) return { success: false, steps: 0, visitedNodes: 0 };
+
+      // If we have a saved state and generator, resume from there
+      if (algorithmState.generator && algorithmState.lastStep && !algorithmState.lastStep.path.length) {
+        set({ isRunning: true });
+        try {
+          let steps = get().currentStep;
+          let visitedNodes = get().visitedNodes;
+
+          for await (const step of algorithmState.generator) {
+            if (!get().isRunning) {
+              set({ algorithmState: { ...algorithmState, lastStep: step } });
+              return { success: false, steps, visitedNodes };
+            }
+
+            steps++;
+            if (step.visited) {
+              visitedNodes += step.visited.length;
+            }
+
+            // Update cell states
+            if (step.visited) {
+              step.visited.forEach(cell => {
+                get().setCellState(cell.x, cell.y, 'visited');
+              });
+            }
+
+            if (step.current) {
+              get().setCellState(step.current.x, step.current.y, 'current');
+            }
+
+            if (step.path.length > 0) {
+              step.path.forEach(cell => {
+                if (cell.type !== 'start' && cell.type !== 'end') {
+                  get().setCellState(cell.x, cell.y, 'path');
+                }
+              });
+              set({
+                isRunning: false,
+                algorithmState: { grid: [], generator: null, lastStep: null }
+              });
+              return { success: true, steps, visitedNodes };
+            }
+
+            set({ currentStep: steps, visitedNodes });
+            await new Promise(resolve => setTimeout(resolve, animationConfig.speed));
+          }
+        } finally {
+          if (animationController) {
+            animationController.cancel();
+            animationController = null;
+          }
+          set({ isRunning: false });
+        }
+        return { success: false, steps: get().currentStep, visitedNodes: get().visitedNodes };
+      }
+
+      // Start new algorithm run
+      set({ isRunning: true, currentStep: 0, visitedNodes: 0 });
+
+      // Reset grid states except for start, end, and blocked cells
+      const newGrid = grid.map(row =>
+        row.map(cell => ({
+          ...cell,
+          state: ['start', 'end', 'blocked'].includes(cell.type)
+            ? cell.state
+            : 'unvisited',
+          parent: undefined,
+          f: undefined,
+          g: undefined,
+          h: undefined,
+        }))
+      );
+      set({ grid: newGrid });
+
+      try {
+        let steps = 0;
+        let visitedNodes = 0;
+
+        const algorithm = algorithms[selectedAlgorithm];
+        if (!algorithm) {
+          return { success: false, steps: 0, visitedNodes: 0 };
+        }
+
+        const generator = algorithm(newGrid, startCell, endCell);
+        set({ algorithmState: { grid: newGrid, generator, lastStep: null } });
+
+        for await (const step of generator) {
+          if (!get().isRunning) {
+            set({ algorithmState: { ...get().algorithmState, lastStep: step } });
+            return { success: false, steps, visitedNodes };
+          }
+
+          steps++;
+          if (step.visited) {
+            visitedNodes += step.visited.length;
+          }
+
+          // Update cell states
+          if (step.visited) {
+            step.visited.forEach(cell => {
+              get().setCellState(cell.x, cell.y, 'visited');
+            });
+          }
+
+          if (step.current) {
+            get().setCellState(step.current.x, step.current.y, 'current');
+          }
+
+          if (step.path.length > 0) {
+            step.path.forEach(cell => {
+              if (cell.type !== 'start' && cell.type !== 'end') {
+                get().setCellState(cell.x, cell.y, 'path');
+              }
+            });
+            set({
+              isRunning: false,
+              algorithmState: { grid: [], generator: null, lastStep: null }
+            });
+            return { success: true, steps, visitedNodes };
+          }
+
+          set({ currentStep: steps, visitedNodes });
+          await new Promise(resolve => setTimeout(resolve, animationConfig.speed));
+        }
+      } finally {
+        if (animationController) {
+          animationController.cancel();
+          animationController = null;
+        }
+        set({ isRunning: false });
+      }
+      return { success: false, steps: get().currentStep, visitedNodes: get().visitedNodes };
+    },
+
+    stopAlgorithm: () => {
+      set({ isRunning: false });
+    },
 
     // Grid data slice
     grid: [],
@@ -149,91 +326,6 @@ export const useGridStore = create<GridConfigStore & AlgorithmStore & GridDataSt
       const { gridConfig } = get();
       get().initializeGrid(gridConfig);
     },
-
-    startAlgorithm: async (): Promise<AlgorithmResult> => {
-      const { grid, startCell, endCell, selectedAlgorithm, animationConfig } = get();
-
-      if (!startCell || !endCell || get().isRunning) return { success: false, steps: 0 };
-
-      set({ isRunning: true });
-
-      // Reset all cells to unvisited except start, end, and blocked cells
-      const newGrid = grid.map(row =>
-        row.map(cell => ({
-          ...cell,
-          state: ['start', 'end', 'blocked'].includes(cell.type)
-            ? cell.state
-            : 'unvisited',
-          parent: undefined,
-          f: undefined,
-          g: undefined,
-          h: undefined,
-        }))
-      );
-      set({ grid: newGrid });
-
-      try {
-        let previousCurrent: Cell | null = null;
-        let visitedCells = new Set<string>();
-
-        // Create animation controller
-        animationController = createThrottledAnimationFrame(animationConfig.speed);
-
-        let steps = 0;
-        let foundPath = false;
-
-        const algorithm = algorithms[selectedAlgorithm];
-        if (!algorithm) {
-          return { success: false, steps: 0 };
-        }
-
-        for await (const step of algorithm(newGrid, startCell, endCell)) {
-          if (!get().isRunning) {
-            return { success: false, steps };
-          }
-
-          steps++;
-
-          // Update cell states
-          if (step.visited) {
-            step.visited.forEach(cell => {
-              get().setCellState(cell.x, cell.y, 'visited');
-            });
-          }
-
-          if (step.current) {
-            get().setCellState(step.current.x, step.current.y, 'current');
-          }
-
-          if (step.path.length > 0) {
-            step.path.forEach(cell => {
-              if (cell.type !== 'start' && cell.type !== 'end') {
-                get().setCellState(cell.x, cell.y, 'path');
-              }
-            });
-            get().stopAlgorithm();
-            return { success: true, steps };
-          }
-
-          await new Promise(resolve => setTimeout(resolve, animationConfig.speed));
-        }
-      } finally {
-        if (animationController) {
-          animationController.cancel();
-          animationController = null;
-        }
-        set({ isRunning: false });
-      }
-      return { success: false, steps };
-    },
-
-    stopAlgorithm: () => {
-      if (animationController) {
-        animationController.cancel();
-        animationController = null;
-      }
-      set({ isRunning: false });
-    },
   };
 });
 
@@ -245,6 +337,7 @@ const animationConfigSelector = (state: StoreState) => state.animationConfig;
 const algorithmStateSelector = (state: StoreState) => ({
   selectedAlgorithm: state.selectedAlgorithm,
   isRunning: state.isRunning,
+  algorithmState: state.algorithmState,
 });
 const gridControlsSelector = (state: StoreState) => ({
   resetGrid: state.resetGrid,

@@ -1,11 +1,6 @@
-export type CellType = 'traversable' | 'blocked' | 'start' | 'end';
+export type CellType = 'start' | 'end' | 'blocked' | 'traversable';
 
-export type CellState =
-  | 'unvisited'
-  | 'neighbor'     // Newly discovered unvisited neighbor
-  | 'current'      // Currently being processed
-  | 'visited'      // Already processed
-  | 'path';        // Part of the final path
+export type CellState = 'unvisited' | 'visited' | 'current' | 'path' | 'neighbor';
 
 export type Cell = {
   id: string;
@@ -39,4 +34,21 @@ export type GridConfig = {
 export type AnimationConfig = {
   speed: number; // milliseconds between steps
   isPlaying: boolean;
-} 
+}
+
+export type AlgorithmStep = {
+  current: Cell;
+  visited?: Cell[];
+  openSet?: Cell[];
+  closedSet?: Cell[];
+  stack?: Cell[];
+  queue?: Cell[];
+  path: Cell[];
+  isForward?: boolean;
+};
+
+export type AlgorithmResult = {
+  success: boolean;
+  steps: number;
+  visitedNodes: number;
+}; 

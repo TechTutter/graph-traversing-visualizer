@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import debounce from 'lodash/debounce';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { LEGEND_ITEMS } from '../constants/colors';
 import { Algorithm } from '../types/grid';
 
@@ -10,6 +11,7 @@ type HeaderProps = {
   onSpeedChange: (speed: number) => void;
   onReset: () => void;
   onPlayPause: () => void;
+  canPlay: boolean;
 };
 
 export function Header({
@@ -20,23 +22,34 @@ export function Header({
   onSpeedChange,
   onReset,
   onPlayPause,
+  canPlay,
 }: HeaderProps) {
   const [showLegend, setShowLegend] = useState(false);
-  const [showMenu, setShowMenu] = useState(false);
+  const [localSpeed, setLocalSpeed] = useState(speed);
+
+  // Create memoized debounced function
+  const debouncedSpeedChange = useMemo(() => debounce((value: number) => onSpeedChange(value), 200), [onSpeedChange]);
+
+  // Cleanup debounced function on unmount
+  useEffect(() => {
+    return () => {
+      debouncedSpeedChange.cancel();
+    };
+  }, [debouncedSpeedChange]);
+
+  const handleSpeedChange = useCallback(
+    (value: number) => {
+      setLocalSpeed(value);
+      debouncedSpeedChange(value);
+    },
+    [debouncedSpeedChange],
+  );
 
   return (
-    <header className="fixed top-0 left-0 right-0 bg-white shadow-md z-50">
-      <div className="flex items-center justify-between px-4 h-16">
-        {/* Left section */}
-        <div className="flex items-center gap-2">
-          {/* Mobile menu button */}
-          <button onClick={() => setShowMenu(!showMenu)} className="md:hidden p-2 hover:bg-gray-100 rounded-lg">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-          </button>
-
-          {/* Algorithm selector - hidden on mobile */}
+    <header className="bg-white border-b border-gray-200">
+      <div className="container mx-auto px-4 py-2 flex justify-between items-center">
+        {/* Left section - Algorithm selector */}
+        <div className="flex items-center gap-4">
           <select
             value={selectedAlgorithm}
             onChange={(e) => onAlgorithmChange(e.target.value as Algorithm)}
@@ -56,17 +69,16 @@ export function Header({
             </optgroup>
           </select>
 
-          {/* Speed slider - hidden on mobile */}
+          {/* Speed control */}
           <div className="hidden md:flex items-center gap-2">
             <input
               type="range"
               min={20}
               max={1000}
               step={10}
-              value={speed}
-              onChange={(e) => onSpeedChange(Number(e.target.value))}
-              className="w-24 disabled:opacity-50"
-              disabled={isRunning}
+              value={localSpeed}
+              onChange={(e) => handleSpeedChange(Number(e.target.value))}
+              className="w-24"
             />
           </div>
         </div>
@@ -91,7 +103,8 @@ export function Header({
             onClick={onPlayPause}
             className={`p-2 rounded-lg text-white ${
               isRunning ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'
-            }`}
+            } disabled:opacity-50`}
+            disabled={!canPlay && !isRunning}
             title={isRunning ? 'Stop' : 'Play'}>
             {isRunning ? (
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -135,52 +148,50 @@ export function Header({
       </div>
 
       {/* Mobile menu */}
-      {showMenu && (
-        <div className="md:hidden border-t border-gray-200 bg-white p-4">
-          <div className="space-y-4">
-            <select
-              value={selectedAlgorithm}
-              onChange={(e) => onAlgorithmChange(e.target.value as Algorithm)}
-              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm disabled:opacity-50"
-              disabled={isRunning}>
-              <optgroup label="Shortest Path">
-                <option value="astar">A*</option>
-                <option value="dijkstra">Dijkstra</option>
-              </optgroup>
-              <optgroup label="Search">
-                <option value="bfs">BFS</option>
-                <option value="dfs">DFS</option>
-                <option value="bidirectionalBfs">Bi-BFS</option>
-              </optgroup>
-              <optgroup label="Maze">
-                <option value="prim">Prim</option>
-              </optgroup>
-            </select>
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-600">Speed:</span>
-              <input
-                type="range"
-                min={20}
-                max={1000}
-                step={10}
-                value={speed}
-                onChange={(e) => onSpeedChange(Number(e.target.value))}
-                className="flex-1 disabled:opacity-50"
-                disabled={isRunning}
-              />
-            </div>
+      <div className="md:hidden border-t border-gray-200 bg-white p-4">
+        <div className="space-y-4">
+          <select
+            value={selectedAlgorithm}
+            onChange={(e) => onAlgorithmChange(e.target.value as Algorithm)}
+            className="w-full rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm disabled:opacity-50"
+            disabled={isRunning}>
+            <optgroup label="Shortest Path">
+              <option value="astar">A*</option>
+              <option value="dijkstra">Dijkstra</option>
+            </optgroup>
+            <optgroup label="Search">
+              <option value="bfs">BFS</option>
+              <option value="dfs">DFS</option>
+              <option value="bidirectionalBfs">Bi-BFS</option>
+            </optgroup>
+            <optgroup label="Maze">
+              <option value="prim">Prim</option>
+            </optgroup>
+          </select>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-600">Speed:</span>
+            <input
+              type="range"
+              min={20}
+              max={1000}
+              step={10}
+              value={localSpeed}
+              onChange={(e) => handleSpeedChange(Number(e.target.value))}
+              className="flex-1"
+            />
           </div>
         </div>
-      )}
+      </div>
 
       {/* Legend popup */}
       {showLegend && (
-        <div className="absolute top-full right-0 mt-2 mr-4 bg-white rounded-lg shadow-lg border border-gray-200 p-4 max-w-xs">
-          <div className="grid grid-cols-2 gap-3">
-            {LEGEND_ITEMS.map(({ label, color }) => (
-              <div key={label} className="flex items-center gap-2">
-                <div className="w-4 h-4 border border-gray-300 rounded-sm" style={{ backgroundColor: color }} />
-                <span className="text-sm text-gray-700">{label}</span>
+        <div className="absolute top-16 right-4 bg-white rounded-lg shadow-lg p-4 border border-gray-200 z-50">
+          <h3 className="font-semibold mb-2">Legend</h3>
+          <div className="space-y-2">
+            {LEGEND_ITEMS.map((item) => (
+              <div key={item.label} className="flex items-center gap-2">
+                <div className={`w-4 h-4 rounded ${item.color}`} />
+                <span className="text-sm">{item.label}</span>
               </div>
             ))}
           </div>

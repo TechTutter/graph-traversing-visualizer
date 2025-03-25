@@ -6,7 +6,7 @@ import { useWindowSize } from './hooks/useWindowSize';
 import { useAlgorithmState, useAnimationConfig, useGridControls } from './store/useGridStore';
 
 function App() {
-  const { selectedAlgorithm, isRunning } = useAlgorithmState();
+  const { selectedAlgorithm, isRunning, algorithmState } = useAlgorithmState();
   const { resetGrid, startAlgorithm, stopAlgorithm, setSelectedAlgorithm, setAnimationSpeed } = useGridControls();
   const { speed } = useAnimationConfig();
   const { cellSize } = useWindowSize();
@@ -17,13 +17,13 @@ function App() {
     if (result.success) {
       toast({
         title: 'Path Found!',
-        description: `Found path in ${result.steps} steps.`,
+        description: `Found path in ${result.steps} steps, visited ${result.visitedNodes} nodes.`,
         duration: 3000,
       });
-    } else {
+    } else if (result.steps > 0) {
       toast({
         title: 'No Path Found',
-        description: 'Could not find a path to the target.',
+        description: `Visited ${result.visitedNodes} nodes but could not find a path to the target.`,
         duration: 3000,
         variant: 'destructive',
       });
@@ -31,7 +31,7 @@ function App() {
   };
 
   return (
-    <div className="h-screen w-screen overflow-hidden bg-gray-100">
+    <div className="flex flex-col h-screen w-screen overflow-hidden bg-gray-100">
       <Header
         selectedAlgorithm={selectedAlgorithm}
         isRunning={isRunning}
@@ -40,8 +40,9 @@ function App() {
         onSpeedChange={setAnimationSpeed}
         onReset={resetGrid}
         onPlayPause={isRunning ? stopAlgorithm : handleStartAlgorithm}
+        canPlay={!isRunning && !algorithmState.lastStep?.path.length}
       />
-      <main className="h-[calc(100vh-64px)]">
+      <main className="flex-1 min-h-0">
         <Grid cellSize={cellSize} />
       </main>
       <Toaster />

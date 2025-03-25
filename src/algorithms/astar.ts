@@ -1,14 +1,13 @@
-import { Cell, Grid } from '../types/grid';
-import { getNeighbors, manhattan } from '../utils/algorithmHelpers';
+import { AlgorithmStep, Cell, Grid } from '../types/grid';
+import { getNeighbors } from '../utils/grid';
 
-type AStarStep = {
-  current: Cell;
-  openSet: Cell[];
-  closedSet: Cell[];
-  path: Cell[];
-};
+type AStarStep = AlgorithmStep;
 
-export async function* astar(grid: Grid, start: Cell, end: Cell): AsyncGenerator<AStarStep> {
+function heuristic(a: Cell, b: Cell): number {
+  return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
+}
+
+export async function* astar(grid: Grid, start: Cell, end: Cell): AsyncGenerator<AStarStep, void, unknown> {
   const openSet: Cell[] = [start];
   const closedSet: Cell[] = [];
   const cameFrom = new Map<string, Cell>();
@@ -16,17 +15,17 @@ export async function* astar(grid: Grid, start: Cell, end: Cell): AsyncGenerator
   const fScore = new Map<string, number>();
 
   gScore.set(start.id, 0);
-  fScore.set(start.id, manhattan(start, end));
+  fScore.set(start.id, heuristic(start, end));
 
   while (openSet.length > 0) {
     // Find the node with the lowest fScore
     let current = openSet[0];
-    let lowestF = fScore.get(current.id) || Infinity;
+    let lowestFScore = fScore.get(current.id) || Infinity;
 
     for (let i = 1; i < openSet.length; i++) {
       const f = fScore.get(openSet[i].id) || Infinity;
-      if (f < lowestF) {
-        lowestF = f;
+      if (f < lowestFScore) {
+        lowestFScore = f;
         current = openSet[i];
       }
     }
@@ -72,7 +71,7 @@ export async function* astar(grid: Grid, start: Cell, end: Cell): AsyncGenerator
 
       cameFrom.set(neighbor.id, current);
       gScore.set(neighbor.id, tentativeGScore);
-      fScore.set(neighbor.id, tentativeGScore + manhattan(neighbor, end));
+      fScore.set(neighbor.id, tentativeGScore + heuristic(neighbor, end));
     }
 
     yield {

@@ -1,14 +1,9 @@
-import { Cell, Grid } from '../types/grid';
-import { getNeighbors } from '../utils/algorithmHelpers';
+import { AlgorithmStep, Cell, Grid } from '../types/grid';
+import { getNeighbors } from '../utils/grid';
 
-type DijkstraStep = {
-  current: Cell;
-  openSet: Cell[];
-  closedSet: Cell[];
-  path: Cell[];
-};
+type DijkstraStep = AlgorithmStep;
 
-export async function* dijkstra(grid: Grid, start: Cell, end: Cell): AsyncGenerator<DijkstraStep> {
+export async function* dijkstra(grid: Grid, start: Cell, end: Cell): AsyncGenerator<DijkstraStep, void, unknown> {
   const openSet: Cell[] = [start];
   const closedSet: Cell[] = [];
   const cameFrom = new Map<string, Cell>();
@@ -19,12 +14,12 @@ export async function* dijkstra(grid: Grid, start: Cell, end: Cell): AsyncGenera
   while (openSet.length > 0) {
     // Find the node with the lowest gScore
     let current = openSet[0];
-    let lowestG = gScore.get(current.id) || Infinity;
+    let lowestGScore = gScore.get(current.id) || Infinity;
 
     for (let i = 1; i < openSet.length; i++) {
       const g = gScore.get(openSet[i].id) || Infinity;
-      if (g < lowestG) {
-        lowestG = g;
+      if (g < lowestGScore) {
+        lowestGScore = g;
         current = openSet[i];
       }
     }

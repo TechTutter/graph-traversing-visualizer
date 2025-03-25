@@ -1,19 +1,14 @@
-import { Cell, Grid } from '../types/grid';
-import { getNeighbors } from '../utils/algorithmHelpers';
+import { AlgorithmStep, Cell, Grid } from '../types/grid';
+import { getNeighbors } from '../utils/grid';
 
-type BFSStep = {
-  current: Cell;
-  queue: Cell[];
-  visited: Set<string>;
-  path: Cell[];
-};
+type BFSStep = AlgorithmStep;
 
-export async function* bfs(grid: Grid, start: Cell, end: Cell): AsyncGenerator<BFSStep> {
+export async function* bfs(grid: Grid, start: Cell, end: Cell): AsyncGenerator<BFSStep, void, unknown> {
   const queue: Cell[] = [start];
-  const visited = new Set<string>();
+  const visited: Cell[] = [];
   const cameFrom = new Map<string, Cell>();
 
-  visited.add(start.id);
+  visited.push(start);
 
   while (queue.length > 0) {
     const current = queue.shift()!;
@@ -42,8 +37,8 @@ export async function* bfs(grid: Grid, start: Cell, end: Cell): AsyncGenerator<B
 
     // Process each unvisited neighbor
     for (const neighbor of neighbors) {
-      if (!visited.has(neighbor.id)) {
-        visited.add(neighbor.id);
+      if (!visited.some(c => c.id === neighbor.id)) {
+        visited.push(neighbor);
         queue.push(neighbor);
         cameFrom.set(neighbor.id, current);
       }

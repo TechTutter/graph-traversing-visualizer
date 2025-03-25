@@ -1,14 +1,9 @@
-import { Cell, Grid } from '../types/grid';
-import { getNeighbors } from '../utils/algorithmHelpers';
+import { AlgorithmStep, Cell, Grid } from '../types/grid';
+import { getNeighbors } from '../utils/grid';
 
-type PrimStep = {
-  current: Cell;
-  openSet: Cell[];
-  closedSet: Cell[];
-  path: Cell[];
-};
+type PrimStep = AlgorithmStep;
 
-export async function* prim(grid: Grid, start: Cell, end: Cell): AsyncGenerator<PrimStep> {
+export async function* prim(grid: Grid, start: Cell, end: Cell): AsyncGenerator<PrimStep, void, unknown> {
   const openSet: Cell[] = [start];
   const closedSet: Cell[] = [];
   const cameFrom = new Map<string, Cell>();

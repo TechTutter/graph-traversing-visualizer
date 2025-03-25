@@ -1,19 +1,13 @@
-import { Cell, Grid } from '../types/grid';
-import { getNeighbors } from '../utils/algorithmHelpers';
+import { AlgorithmStep, Cell, Grid } from '../types/grid';
+import { getNeighbors } from '../utils/grid';
 
-type BidirectionalBFSStep = {
-  current: Cell;
-  queue: Cell[];
-  visited: Set<string>;
-  path: Cell[];
-  isForward: boolean;
-};
+type BidirectionalBFSStep = AlgorithmStep;
 
-export async function* bidirectionalBfs(grid: Grid, start: Cell, end: Cell): AsyncGenerator<BidirectionalBFSStep> {
+export async function* bidirectionalBfs(grid: Grid, start: Cell, end: Cell): AsyncGenerator<BidirectionalBFSStep, void, unknown> {
   const forwardQueue: Cell[] = [start];
   const backwardQueue: Cell[] = [end];
-  const forwardVisited = new Set<string>([start.id]);
-  const backwardVisited = new Set<string>([end.id]);
+  const forwardVisited: Cell[] = [start];
+  const backwardVisited: Cell[] = [end];
   const forwardCameFrom = new Map<string, Cell>();
   const backwardCameFrom = new Map<string, Cell>();
 
@@ -22,11 +16,9 @@ export async function* bidirectionalBfs(grid: Grid, start: Cell, end: Cell): Asy
     const current = forwardQueue.shift()!;
 
     // Check if we've found a meeting point
-    if (backwardVisited.has(current.id)) {
-      // Reconstruct path from both directions
+    if (backwardVisited.some(c => c.id === current.id)) {
       const path: Cell[] = [];
-
-      // Forward path
+      // Reconstruct path from start to meeting point
       let curr = current;
       while (forwardCameFrom.has(curr.id)) {
         path.unshift(curr);
@@ -34,7 +26,7 @@ export async function* bidirectionalBfs(grid: Grid, start: Cell, end: Cell): Asy
       }
       path.unshift(start);
 
-      // Backward path
+      // Reconstruct path from meeting point to end
       curr = current;
       while (backwardCameFrom.has(curr.id)) {
         curr = backwardCameFrom.get(curr.id)!;
@@ -43,19 +35,21 @@ export async function* bidirectionalBfs(grid: Grid, start: Cell, end: Cell): Asy
 
       yield {
         current,
-        queue: forwardQueue,
-        visited: forwardVisited,
+        queue: [...forwardQueue, ...backwardQueue],
+        visited: [...forwardVisited, ...backwardVisited],
         path,
         isForward: true,
       };
       return;
     }
 
-    // Process forward neighbors
-    const forwardNeighbors = getNeighbors(grid, current);
-    for (const neighbor of forwardNeighbors) {
-      if (!forwardVisited.has(neighbor.id)) {
-        forwardVisited.add(neighbor.id);
+    // Get neighbors
+    const neighbors = getNeighbors(grid, current);
+
+    // Process each unvisited neighbor
+    for (const neighbor of neighbors) {
+      if (!forwardVisited.some(c => c.id === neighbor.id)) {
+        forwardVisited.push(neighbor);
         forwardQueue.push(neighbor);
         forwardCameFrom.set(neighbor.id, current);
       }
@@ -63,60 +57,60 @@ export async function* bidirectionalBfs(grid: Grid, start: Cell, end: Cell): Asy
 
     yield {
       current,
-      queue: [...forwardQueue],
-      visited: forwardVisited,
+      queue: [...forwardQueue, ...backwardQueue],
+      visited: [...forwardVisited, ...backwardVisited],
       path: [],
       isForward: true,
     };
 
     // Backward search
     if (backwardQueue.length > 0) {
-      const current = backwardQueue.shift()!;
+      const backwardCurrent = backwardQueue.shift()!;
 
       // Check if we've found a meeting point
-      if (forwardVisited.has(current.id)) {
-        // Reconstruct path from both directions
+      if (forwardVisited.some(c => c.id === backwardCurrent.id)) {
         const path: Cell[] = [];
-
-        // Forward path to meeting point
-        let curr = current;
+        // Reconstruct path from start to meeting point
+        let curr = backwardCurrent;
         while (forwardCameFrom.has(curr.id)) {
           path.unshift(curr);
           curr = forwardCameFrom.get(curr.id)!;
         }
         path.unshift(start);
 
-        // Backward path from meeting point
-        curr = current;
+        // Reconstruct path from meeting point to end
+        curr = backwardCurrent;
         while (backwardCameFrom.has(curr.id)) {
           curr = backwardCameFrom.get(curr.id)!;
           path.push(curr);
         }
 
         yield {
-          current,
-          queue: backwardQueue,
-          visited: backwardVisited,
+          current: backwardCurrent,
+          queue: [...forwardQueue, ...backwardQueue],
+          visited: [...forwardVisited, ...backwardVisited],
           path,
           isForward: false,
         };
         return;
       }
 
-      // Process backward neighbors
-      const backwardNeighbors = getNeighbors(grid, current);
+      // Get neighbors
+      const backwardNeighbors = getNeighbors(grid, backwardCurrent);
+
+      // Process each unvisited neighbor
       for (const neighbor of backwardNeighbors) {
-        if (!backwardVisited.has(neighbor.id)) {
-          backwardVisited.add(neighbor.id);
+        if (!backwardVisited.some(c => c.id === neighbor.id)) {
+          backwardVisited.push(neighbor);
           backwardQueue.push(neighbor);
-          backwardCameFrom.set(neighbor.id, current);
+          backwardCameFrom.set(neighbor.id, backwardCurrent);
         }
       }
 
       yield {
-        current,
-        queue: [...backwardQueue],
-        visited: backwardVisited,
+        current: backwardCurrent,
+        queue: [...forwardQueue, ...backwardQueue],
+        visited: [...forwardVisited, ...backwardVisited],
         path: [],
         isForward: false,
       };
@@ -127,7 +121,7 @@ export async function* bidirectionalBfs(grid: Grid, start: Cell, end: Cell): Asy
   yield {
     current: start,
     queue: [],
-    visited: forwardVisited,
+    visited: [...forwardVisited, ...backwardVisited],
     path: [],
     isForward: true,
   };
