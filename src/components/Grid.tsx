@@ -1,5 +1,6 @@
-import React from 'react';
-import { useGridData } from '../store/useGridStore';
+import React, { useCallback, useEffect } from 'react';
+import { useGridData, useGridStore } from '../store/useGridStore';
+import { calculateGridConfig } from '../utils/grid';
 import Cell from './Cell';
 
 type GridProps = {
@@ -9,31 +10,38 @@ type GridProps = {
 function Grid({ cellSize }: GridProps) {
   const { grid, initializeGrid, gridConfig } = useGridData();
 
-  React.useEffect(() => {
-    if (!grid.length) {
-      initializeGrid(gridConfig);
-    }
-  }, [grid.length, initializeGrid, gridConfig]);
+  const handleResize = useCallback(() => {
+    const { gridConfig } = useGridStore.getState();
+    const newConfig = calculateGridConfig(gridConfig);
+    useGridStore.getState().setGridConfig(newConfig);
+    useGridStore.getState().stopAlgorithm();
+    useGridStore.getState().resetGrid();
+  }, []);
+
+  useEffect(() => {
+    initializeGrid(gridConfig);
+  }, [gridConfig, initializeGrid]);
+
+  useEffect(() => {
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [handleResize]);
 
   return (
-    <div className="w-full h-full flex items-center justify-center">
-      <div className="grid auto-rows-max content-center">
-        {grid.map((row, rowIndex) => (
-          <div key={rowIndex} className="flex flex-nowrap">
-            {row.map((cell, colIndex) => (
-              <Cell
-                key={`${rowIndex}-${colIndex}`}
-                cell={cell}
-                size={cellSize}
-                onClick={() => {}}
-                onMouseEnter={() => {}}
-              />
-            ))}
-          </div>
-        ))}
+    <div className="relative">
+      <div
+        className="grid gap-0"
+        style={{
+          gridTemplateColumns: `repeat(${grid[0]?.length || 0}, ${cellSize}px)`,
+        }}>
+        {grid.map((row) =>
+          row.map((cell) => (
+            <Cell key={cell.id} cell={cell} size={cellSize} onClick={() => {}} onMouseEnter={() => {}} />
+          )),
+        )}
       </div>
     </div>
   );
 }
 
-export default Grid;
+export default React.memo(Grid);

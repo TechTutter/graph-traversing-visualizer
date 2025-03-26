@@ -1,8 +1,7 @@
-import { Cell, Grid } from '../types/grid';
+import { Cell, Grid, GridConfig } from '../types/grid';
 
 export function getNeighbors(grid: Grid, cell: Cell): Cell[] {
   const neighbors: Cell[] = [];
-  const { x, y } = cell;
   const directions = [
     [-1, 0], // left
     [1, 0],  // right
@@ -11,8 +10,8 @@ export function getNeighbors(grid: Grid, cell: Cell): Cell[] {
   ];
 
   for (const [dx, dy] of directions) {
-    const newX = x + dx;
-    const newY = y + dy;
+    const newX = cell.x + dx;
+    const newY = cell.y + dy;
 
     if (
       newX >= 0 &&
@@ -26,4 +25,15 @@ export function getNeighbors(grid: Grid, cell: Cell): Cell[] {
   }
 
   return neighbors;
-} 
+}
+
+export function calculateGridConfig(config: GridConfig): GridConfig {
+  const maxRows = Math.floor(window.innerHeight / 30); // 30px per cell
+  const maxCols = Math.floor(window.innerWidth / 30);
+
+  return {
+    ...config,
+    rows: Math.min(config.rows, maxRows),
+    cols: Math.min(config.cols, maxCols),
+  };
+}

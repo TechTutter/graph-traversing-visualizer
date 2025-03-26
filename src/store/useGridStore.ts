@@ -16,6 +16,7 @@ type AlgorithmStore = {
   animationConfig: AnimationConfig;
   currentStep: number;
   visitedNodes: number;
+  visitedSet: Set<string>;
   algorithmState: {
     grid: Grid;
     generator: AsyncGenerator<AlgorithmStep, void, unknown> | null;
@@ -76,6 +77,7 @@ export const useGridStore = create<GridConfigStore & AlgorithmStore & GridDataSt
     animationConfig: DEFAULT_ANIMATION_CONFIG,
     currentStep: 0,
     visitedNodes: 0,
+    visitedSet: new Set(),
     algorithmState: {
       grid: [],
       generator: null,
@@ -101,6 +103,7 @@ export const useGridStore = create<GridConfigStore & AlgorithmStore & GridDataSt
         grid: newGrid,
         currentStep: 0,
         visitedNodes: 0,
+        visitedSet: new Set(),
         algorithmState: {
           grid: [],
           generator: null,
@@ -121,12 +124,16 @@ export const useGridStore = create<GridConfigStore & AlgorithmStore & GridDataSt
 
       if (!startCell || !endCell) return { success: false, steps: 0, visitedNodes: 0 };
 
+      // Reset visited nodes tracking
+      set({ visitedNodes: 0, visitedSet: new Set() });
+
       // If we have a saved state and generator, resume from there
       if (algorithmState.generator && algorithmState.lastStep && !algorithmState.lastStep.path.length) {
         set({ isRunning: true });
         try {
           let steps = get().currentStep;
           let visitedNodes = get().visitedNodes;
+          const visitedSet = new Set(get().visitedSet);
 
           for await (const step of algorithmState.generator) {
             if (!get().isRunning) {
@@ -136,12 +143,11 @@ export const useGridStore = create<GridConfigStore & AlgorithmStore & GridDataSt
 
             steps++;
             if (step.visited) {
-              visitedNodes += step.visited.length;
-            }
-
-            // Update cell states
-            if (step.visited) {
               step.visited.forEach(cell => {
+                if (!visitedSet.has(cell.id)) {
+                  visitedSet.add(cell.id);
+                  visitedNodes++;
+                }
                 get().setCellState(cell.x, cell.y, 'visited');
               });
             }
@@ -163,7 +169,7 @@ export const useGridStore = create<GridConfigStore & AlgorithmStore & GridDataSt
               return { success: true, steps, visitedNodes };
             }
 
-            set({ currentStep: steps, visitedNodes });
+            set({ currentStep: steps, visitedNodes, visitedSet });
             await new Promise(resolve => setTimeout(resolve, animationConfig.speed));
           }
         } finally {
@@ -177,7 +183,7 @@ export const useGridStore = create<GridConfigStore & AlgorithmStore & GridDataSt
       }
 
       // Start new algorithm run
-      set({ isRunning: true, currentStep: 0, visitedNodes: 0 });
+      set({ isRunning: true, currentStep: 0, visitedNodes: 0, visitedSet: new Set() });
 
       // Reset grid states except for start, end, and blocked cells
       const newGrid = grid.map(row =>
@@ -197,6 +203,7 @@ export const useGridStore = create<GridConfigStore & AlgorithmStore & GridDataSt
       try {
         let steps = 0;
         let visitedNodes = 0;
+        const visitedSet = new Set<string>();
 
         const algorithm = algorithms[selectedAlgorithm];
         if (!algorithm) {
@@ -214,12 +221,11 @@ export const useGridStore = create<GridConfigStore & AlgorithmStore & GridDataSt
 
           steps++;
           if (step.visited) {
-            visitedNodes += step.visited.length;
-          }
-
-          // Update cell states
-          if (step.visited) {
             step.visited.forEach(cell => {
+              if (!visitedSet.has(cell.id)) {
+                visitedSet.add(cell.id);
+                visitedNodes++;
+              }
               get().setCellState(cell.x, cell.y, 'visited');
             });
           }
@@ -241,7 +247,7 @@ export const useGridStore = create<GridConfigStore & AlgorithmStore & GridDataSt
             return { success: true, steps, visitedNodes };
           }
 
-          set({ currentStep: steps, visitedNodes });
+          set({ currentStep: steps, visitedNodes, visitedSet });
           await new Promise(resolve => setTimeout(resolve, animationConfig.speed));
         }
       } finally {
@@ -255,7 +261,28 @@ export const useGridStore = create<GridConfigStore & AlgorithmStore & GridDataSt
     },
 
     stopAlgorithm: () => {
-      set({ isRunning: false });
+      const { grid } = get();
+      // Reset grid states except for start, end, and blocked cells
+      const newGrid = grid.map(row =>
+        row.map(cell => ({
+          ...cell,
+          state: ['start', 'end', 'blocked'].includes(cell.type)
+            ? cell.state
+            : 'unvisited',
+          parent: undefined,
+          f: undefined,
+          g: undefined,
+          h: undefined,
+        }))
+      );
+      set({
+        isRunning: false,
+        grid: newGrid,
+        currentStep: 0,
+        visitedNodes: 0,
+        visitedSet: new Set(),
+        algorithmState: { grid: [], generator: null, lastStep: null }
+      });
     },
 
     // Grid data slice

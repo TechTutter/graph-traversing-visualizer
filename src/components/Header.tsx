@@ -1,7 +1,7 @@
 import debounce from 'lodash/debounce';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { LEGEND_ITEMS } from '../constants/colors';
 import { Algorithm } from '../types/grid';
+import { Legend } from './Legend';
 
 type HeaderProps = {
   selectedAlgorithm: Algorithm;
@@ -77,8 +77,9 @@ export function Header({
               max={1000}
               step={10}
               value={localSpeed}
+              disabled={isRunning}
               onChange={(e) => handleSpeedChange(Number(e.target.value))}
-              className="w-24"
+              className="w-24 disabled:opacity-30"
             />
           </div>
         </div>
@@ -87,7 +88,7 @@ export function Header({
         <div className="flex items-center gap-2">
           <button
             onClick={onReset}
-            className="p-2 hover:bg-gray-100 rounded-lg disabled:opacity-50"
+            className="p-2 hover:bg-gray-100 rounded-lg disabled:opacity-30"
             disabled={isRunning}
             title="Shuffle Grid">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -103,7 +104,7 @@ export function Header({
             onClick={onPlayPause}
             className={`p-2 rounded-lg text-white ${
               isRunning ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'
-            } disabled:opacity-50`}
+            } disabled:opacity-30`}
             disabled={!canPlay && !isRunning}
             title={isRunning ? 'Stop' : 'Play'}>
             {isRunning ? (
@@ -185,16 +186,8 @@ export function Header({
 
       {/* Legend popup */}
       {showLegend && (
-        <div className="absolute top-16 right-4 bg-white rounded-lg shadow-lg p-4 border border-gray-200 z-50">
-          <h3 className="font-semibold mb-2">Legend</h3>
-          <div className="space-y-2">
-            {LEGEND_ITEMS.map((item) => (
-              <div key={item.label} className="flex items-center gap-2">
-                <div className={`w-4 h-4 rounded ${item.color}`} />
-                <span className="text-sm">{item.label}</span>
-              </div>
-            ))}
-          </div>
+        <div className="absolute top-16 right-4 z-50">
+          <Legend variant="popup" />
         </div>
       )}
     </header>
