@@ -1,6 +1,6 @@
 # Graph Traversing Visualizer
 
-A modern web application that visualizes different pathfinding algorithms in action. Built with React, TypeScript, and D3.js, this project demonstrates various graph traversal algorithms through an interactive and animated grid-based interface.
+A modern web application that visualizes different pathfinding algorithms in action. Built with React, TypeScript, and D3.js, this project demonstrates various graph traversal algorithms through an interactive and animated grid-based interface. See a live demo at [https://lepre-show-time.web.app/](https://lepre-show-time.web.app/)
 
 ## Features
 
