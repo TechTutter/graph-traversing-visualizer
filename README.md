@@ -55,14 +55,3 @@ yarn run dev
 ```
 
 The application will be available at `http://localhost:5173`
-
-## Project Structure
-
-```
-src/
-├── components/     # React components
-├── lib/           # Utility functions and algorithms
-├── styles/        # Global styles
-├── types/         # TypeScript type definitions
-└── store/         # Zustand store
-```
